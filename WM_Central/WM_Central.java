@@ -13,7 +13,8 @@ public class WM_Central{
                     "operario_actual TEXT, " +
                     "caudal_actual REAL DEFAULT 0, " + 
                     "volumen_actual REAL DEFAULT 0, " +
-                    "ubicacion TEXT)";
+                    "ubicacion TEXT, " +
+                    "credencial_hash TEXT)";
 
         try (var conn = DriverManager.getConnection(url);
             var stmt = conn.createStatement()) {
@@ -81,18 +82,7 @@ public class WM_Central{
         String url = "jdbc:sqlite:/app/data/WM.db";
         String sql = "INSERT OR IGNORE INTO aspersores (id, estado, operario_actual, caudal_actual, volumen_actual, ubicacion, direccion) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-        String[][] datos = {
-            {"WS-01", "DESCONECTADA", "NULL", "-"},
-            {"WS-02", "DESCONECTADA", "NULL", "-"},
-            {"WS-03", "DESCONECTADA", "NULL", "-"},
-            {"WS-04", "DESCONECTADA", "NULL", "-"},
-            {"WS-05", "DESCONECTADA", "NULL", "-"},
-            {"WS-06", "DESCONECTADA", "NULL", "-"},
-            {"WS-07", "DESCONECTADA", "NULL", "-"},
-            {"WS-08", "DESCONECTADA", "NULL", "-"},
-            {"WS-09", "DESCONECTADA", "NULL", "-"},
-            {"WS-10", "DESCONECTADA", "NULL", "-"}
-        };
+        String[][] datos = {};
 
         try (var conn = DriverManager.getConnection(url);
             var pstmt = conn.prepareStatement(sql)) {

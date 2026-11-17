@@ -3,7 +3,7 @@
 *.jar
 !**/lib/*.jar
 *.db
-*.vscode
+*
 data/
 broker/
 out/

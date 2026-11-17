@@ -308,7 +308,24 @@ def autenticar_estacion(estacion_id, credencial):
         return False
     return peticion.status_code == 200
 
+CARPETA_CRED = os.getenv("CARPETA_CREDENCIALES", ".")
+
+def leer_documento_credencial(estacion_id):
+    direccion = os.path.join(CARPETA_CRED, f"credencial-{estacion_id}.txt")
+    if not os.path.exists(direccion):
+        return None
+    with open(direccion) as fichero:
+        return fichero.read().strip()
     
+
+def generar_fichero(estacion_id, cred):
+    file = open(os.path.join(CARPETA_CRED, f"credencial-{estacion_id}.txt"), "w")
+    file.write(cred)
+    file.close()
+
+##########################################################
+#                           MAIN                         #
+##########################################################
 def main():
     global producer_kafka, consumer_ordenes
     print("#################################################################")
@@ -356,6 +373,28 @@ def main():
             
         except KafkaError as e:
             print(f"[WM_WS_M] Ocurrió un error general de Kafka: {e}")
+            
+        ###########################################################################################
+        ###########################################################################################
+        ##                                      PRÁCTICA 2                                       ##
+        ###########################################################################################
+        ###########################################################################################
+        
+        tramos = MENSAJE.split('#')
+        estacion_id = tramos[1]
+        ubicacion = tramos[2]
+        direccion = tramos[3]
+        
+        credencial = leer_documento_credencial(estacion_id)
+        
+        if credencial is None:
+            print("No se pudo obtener la credencial. Registrando en WM_Registry")
+            cred = registrar_estacion(estacion_id, direccion, ubicacion)
+            if cred is None:
+                print("[WM_WS_M] No se pudo obtener la credencial")
+                return
+            generar_fichero(estacion_id, cred)
+            
         
         # Hilo donde hace de cliente con el servidor WM_Central
         t_client = threading.Thread(target=hilo_cliente_central, args=(MENSAJE, ADDR))
