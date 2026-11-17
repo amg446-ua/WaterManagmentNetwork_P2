@@ -13,3 +13,7 @@ kafka_2.13-4.3.1/
 prueba_consumidor.py
 prueba_consumidor-2.py
 prueba_kafka.py
+env
+.env
+.pytest_cache
+certs
