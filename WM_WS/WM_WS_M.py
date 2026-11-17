@@ -6,6 +6,9 @@ import time
 from kafka import KafkaProducer
 from kafka import KafkaConsumer
 from kafka.errors import NoBrokersAvailable, KafkaError
+import os
+import requests
+from  requests.exceptions import RequestException
 
 FORMAT = "utf-8"
 HEADER = 1024
@@ -255,7 +258,57 @@ def escuchar_ordenes(MENSAJE):
                 print("[WM_WS_M] No hay conexión con Central; activación no notificada.")
         
         consumer_ordenes.commit()
+        
+##################################################################################        
+##################################################################################
+##                              PRÁCTICA 2                                      ##
+##################################################################################
+##################################################################################
 
+def registrar_estacion(estacion_id, direccion, ubicacion):
+    endpoint = "https://localhost:8443"
+    certificado  = "../certs/cert.pem"
+    
+    datos = {"id": estacion_id, "direccion": direccion, "ubicacion": ubicacion}
+    try:
+        peticion = requests.post(f"{endpoint}/estaciones", json=datos, verify=certificado, timeout=5)
+    except (RequestException, OSError) as e:
+        print(f"[WM_WS_M]: No se pudo conectar con WM_Registry: {e}")
+        return None
+    
+    if peticion.status_code == 201:
+        return peticion.json()["credencial"]
+    
+    print(f"[WM_WS_M] Registro doengado: {peticion.status_code}: {peticion.json().get('detail')}")
+    return None
+
+def eliminar_estacion(estacion_id, credencial):
+    endpoint = "https://localhost:8443"
+    certificado  = "../certs/cert.pem"
+    
+    try:
+        peticion = requests.delete(f"{endpoint}/estaciones/{estacion_id}",
+                                    headers={"x-credencial": credencial}, verify=certificado, timeout=5)
+    except (RequestException, OSError) as e:
+        print(f"[WM_WS_M]: No se pudo conectar con WM_Registry: {e}")
+        return False
+
+    return peticion.status_code == 200
+
+def autenticar_estacion(estacion_id, credencial):
+    endpoint = "https://localhost:8443"
+    certificado  = "../certs/cert.pem"
+    
+    try:
+        peticion = requests.post(f"{endpoint}/estaciones/{estacion_id}/autenticar",
+                                headers={"x-credencial": credencial}, verify=certificado, timeout=5)
+    
+    except (RequestException, OSError) as e:
+        print(f"[WM_WS_M]: No se pudo conectar con WM_Registry: {e}")
+        return False
+    return peticion.status_code == 200
+
+    
 def main():
     global producer_kafka, consumer_ordenes
     print("#################################################################")
