@@ -1,5 +1,11 @@
 import java.lang.Exception;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.spec.MGF1ParameterSpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -15,6 +21,10 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import javax.crypto.*;
+import javax.crypto.spec.OAEPParameterSpec;
+import javax.crypto.spec.PSource;
+//import javax.swing.text.AsyncBoxView.ChildLocator;
 
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -25,6 +35,10 @@ public class WM_Central_Thread extends Thread {
 
     // Mapa para almacenar los latches de espera por ID de estación
     public static ConcurrentHashMap<String, CountDownLatch> estacionesPendientesActivacion = new ConcurrentHashMap<>();
+
+    // Asociar a cada estación su clave privada
+    public static ConcurrentHashMap<String, SecretKey> claveSesion_estacion = new ConcurrentHashMap<>();
+
     public static final String URL_BD = "jdbc:sqlite:" + System.getenv().getOrDefault("DB_PATH", "/app/data/WM.db");
     public WM_Central_Thread(Socket skCliente, String broker) {
         this.skCliente = skCliente;
@@ -57,7 +71,7 @@ public class WM_Central_Thread extends Thread {
     }
 
     public boolean validarCadena(String[] partes){
-        return partes.length == 3 && partes[0].equals("REGISTRO");
+        return partes.length == 4 && partes[0].equals("REGISTRO");
     }
 
     public String[] splitear(String Cadena){
@@ -288,7 +302,28 @@ public class WM_Central_Thread extends Thread {
             System.out.println("[Central] Error validando estación: " + e.getMessage());
             return false;
         }
-}
+    }
+
+    /*
+        Generamos la clave para realizar el cifrado y descifrado de los datos
+    */
+    public static SecretKey generarClaveAES() throws NoSuchAlgorithmException {
+        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(256);
+        return keyGen.generateKey();
+    }
+
+    /*
+        Cifrar la clave de sesión mediante la clave pública 
+    */
+    public static String cifrarConClavePublica(PublicKey clavePublica, byte[] claveSesion) throws Exception{
+        Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPPadding");
+        OAEPParameterSpec oaepParams = new OAEPParameterSpec("SHA-256", "MGF1", MGF1ParameterSpec.SHA256, PSource.PSpecified.DEFAULT);
+
+        cipher.init(Cipher.ENCRYPT_MODE, clavePublica, oaepParams);
+
+        return Base64.getEncoder().encodeToString(cipher.doFinal(claveSesion));
+    }
 
     public void run(){
         String Cadena = "";
@@ -296,6 +331,7 @@ public class WM_Central_Thread extends Thread {
         String registro = "";
         String id_estacion = "";
         String credencial = "";
+        String clave_publica = "";
 
         Properties producerProps = new Properties();
         producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, this.broker);
@@ -327,6 +363,9 @@ public class WM_Central_Thread extends Thread {
                 registro = partes[0];
                 id_estacion = partes[1];
                 credencial = partes[2];
+                clave_publica = partes[3];
+
+                byte[] c_publica = Base64.getDecoder().decode(clave_publica);
 
                 // Validación de la credencial
                 if(validarEstacion(id_estacion, credencial)){
@@ -341,7 +380,17 @@ public class WM_Central_Thread extends Thread {
                     String ubicacion = getUbicacionWS(id_estacion);
                     String direccion = getDireccionWS(id_estacion);
                     System.out.println(registro + " ID_ESTACION: " + id_estacion + ", UBICACIÓN: " + ubicacion);
-                    respuesta = "STATUS#OK#Estacion: " + ubicacion + " registrada correctamente";
+                    
+                    /*
+                    Generar la clave del cifrado simétrico y cifrarlo para mandarlo a Monitor
+                    */
+                    SecretKey claveSesion = generarClaveAES();
+                    PublicKey publicaMonitor = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(c_publica));
+                    String claveCifrada = cifrarConClavePublica(publicaMonitor, claveSesion.getEncoded());
+                    
+                    claveSesion_estacion.put(id_estacion, claveSesion);
+
+                    respuesta = "STATUS#OK#" + claveCifrada;
                     escribirSocket(skCliente, respuesta);
                     WM_Central_Thread.actualizarUbicacion(id_estacion, direccion, ubicacion);
                     //estado = "DISPONIBLE";
@@ -359,7 +408,7 @@ public class WM_Central_Thread extends Thread {
 
                             updateConexion_BBDD("DESCONECTADA", id_estacion);
                             resetearWS(id_estacion);
-
+                            claveSesion_estacion.remove(id_estacion);
                             if("REGANDO".equals(estadoAnterior) && operarioAnterior != null){
                                 setOperarioActual(id_estacion, operarioAnterior);
                             }
@@ -411,6 +460,7 @@ public class WM_Central_Thread extends Thread {
                                 System.out.println("ALERTA DE DESCONEXIÓN Estación: " + id_estacion);
                                 updateConexion_BBDD("DESCONECTADA", id_estacion);
                                 resetearWS(id_estacion);
+                                claveSesion_estacion.remove(id_estacion);
                             }
                         }
                     }
