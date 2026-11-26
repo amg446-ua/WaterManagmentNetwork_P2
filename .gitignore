@@ -16,3 +16,5 @@ env
 .env
 .pytest_cache
 certs
+credencial-*.txt
+WM_Central/lib/jbcrypt-0.4.jar
