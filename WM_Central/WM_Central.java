@@ -6,7 +6,7 @@ import java.sql.SQLException;
 public class WM_Central{
 
     public static void createTable(){
-        String url = "jdbc:sqlite:/app/data/WM.db";
+        String url = WM_Central_Thread.URL_BD;
         String sql = "CREATE TABLE IF NOT EXISTS aspersores (" +
                     "id TEXT PRIMARY KEY, " +
                     "estado TEXT, " +
@@ -36,7 +36,7 @@ public class WM_Central{
     }
 
     public static void createOperatorTable(){
-        String url = "jdbc:sqlite:/app/data/WM.db";
+        String url = WM_Central_Thread.URL_BD;
         String sql = "CREATE TABLE IF NOT EXISTS operarios (" + 
                     "id TEXT PRIMARY KEY, " + 
                     "nombre TEXT)";
@@ -50,7 +50,7 @@ public class WM_Central{
     }
 
     public static void insertartOperarios(){
-        String url = "jdbc:sqlite:/app/data/WM.db";
+        String url = WM_Central_Thread.URL_BD;
         String sql = "INSERT OR IGNORE INTO operarios (id, nombre) VALUES (?, ?)";
 
         String[][] datos = {
@@ -79,7 +79,7 @@ public class WM_Central{
     }
 
     public static void insertarDatosPrueba(){
-        String url = "jdbc:sqlite:/app/data/WM.db";
+        String url = WM_Central_Thread.URL_BD;
         String sql = "INSERT OR IGNORE INTO aspersores (id, estado, operario_actual, caudal_actual, volumen_actual, ubicacion, direccion) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         String[][] datos = {};
@@ -108,7 +108,7 @@ public class WM_Central{
     }
 
     public static void inicializarEstados(){
-        String url = "jdbc:sqlite:/app/data/WM.db";
+        String url = WM_Central_Thread.URL_BD;
         var sql = "UPDATE aspersores SET " +
             "operario_actual = CASE WHEN estado = 'REGANDO' THEN operario_actual ELSE NULL END, " +
             "estado = 'DESCONECTADA', " +
@@ -123,22 +123,23 @@ public class WM_Central{
     }
     
     public static void actualizarUbicacion(String id_estacion, String ubicacionCompleta){
-    String[] partes = ubicacionCompleta.split("-", 2); // separa en MÁXIMO 2: ciudad | resto
-    String ciudad = partes[0];
-    String direccion = partes.length > 1 ? partes[1] : "-";
+        String[] partes = ubicacionCompleta.split("-", 2); // separa en MÁXIMO 2: ciudad | resto
+        String ciudad = partes[0];
+        String direccion = partes.length > 1 ? partes[1] : "-";
 
-    var url = "jdbc:sqlite:/app/data/WM.db";
-    var sql = "UPDATE aspersores SET ubicacion = ?, direccion = ? WHERE id = ?";
-    try (var conn = DriverManager.getConnection(url); var pstmt = conn.prepareStatement(sql)) {
-        pstmt.setString(1, ciudad);
-        pstmt.setString(2, direccion);
-        pstmt.setString(3, id_estacion);
-        pstmt.executeUpdate();
-    } catch (SQLException e) {
-        System.err.println("Error actualizando ubicación: " + e.getMessage());
+        var url = WM_Central_Thread.URL_BD;
+        var sql = "UPDATE aspersores SET ubicacion = ?, direccion = ? WHERE id = ?";
+        try (var conn = DriverManager.getConnection(url); var pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, ciudad);
+            pstmt.setString(2, direccion);
+            pstmt.setString(3, id_estacion);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error actualizando ubicación: " + e.getMessage());
+        }
     }
-}
 
+    
 
     public static void main(String args[]){
 
