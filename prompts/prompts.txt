@@ -13,5 +13,19 @@ Ahora para probarlo en local podemos poner la url de la bbdd en local. Luego WM_
 
 No, haremos que WM_Registry sea otro servicio.
 
+Para que no se pueda obtener la credencial ni los mensajes enviados de monitor a central, podemos cifrarlos con un cifrado simétrico. Y usar un cifrado asimétrico para compartir esta clave privada del cifrado simétrico. Para tener una mayor seguridad y evitar que se pueda robar esta clave cuando la compartimos de un servicio a otro
+
+Pero entonces si queremos que la clave del cifrado simétrico la pase central, el que tiene que tener la clave privada del cifrado asimétrico tiene que ser monitor y el de la clave publica central no?
+Esto es seguro y una buena práctica?
+
+Si pero entonces deberíamos crear tantas claves privadas como monitores creemos. Esto es eficiente y seguro?
+
+Puedes explicarme como funciona aquí la funcion generadora de máscara MGF1?
+
+Pero la semilla en este caso donde está? No entiendo muy bien el parámetro MGF1
+
+Ya tengo la clave de sesión codificada, ahora debo mandarla al monitor no?
+
+
 
 https://www.datacamp.com/es/tutorial/making-http-requests-in-python
