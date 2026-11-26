@@ -9,6 +9,7 @@ from kafka.errors import NoBrokersAvailable, KafkaError
 import os
 import requests
 from  requests.exceptions import RequestException
+from crypto import autenticacion_estacion, descencriptar_clave_sesion
 
 FORMAT = "utf-8"
 HEADER = 1024
@@ -21,6 +22,7 @@ conn_engine = None
 orden_pendiente = None
 bloq = False
 bloqueada = False
+claveSesion = None
 
 def enviar_utf(sock, texto):
     datos = texto.encode(FORMAT)
@@ -36,8 +38,9 @@ def recibir_utf(sock):
     return datos.decode(FORMAT)
 
 
-def hilo_cliente_central(MENSAJE, ADDR):
-    global sock_central
+def hilo_cliente_central(estacion_id, credencial, ADDR):
+    global sock_central, claveSesion
+    
     while True:
         try:
             cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -45,20 +48,25 @@ def hilo_cliente_central(MENSAJE, ADDR):
             cliente.connect(ADDR)
             print(f"Establecida conexión en [{ADDR}]")
 
-            print("Envio al servidor: ", MENSAJE)
-            enviar_utf(cliente, MENSAJE)
+            trama, clave_privada = autenticacion_estacion(estacion_id, credencial)
+            
+            print("Envio de autenticación de: ", estacion_id)
+            enviar_utf(cliente, trama)
             respuesta = recibir_utf(cliente)
             print("Recibo del Servidor: ", respuesta)
 
-            if "OK" in respuesta:
+            if respuesta.startswith("STATUS#OK"):
+                # Obtenemos la clave de sesión y la desencriptamos
+                claveSesion = descencriptar_clave_sesion(clave_privada, respuesta.split("#")[2])
+                print("Clave de sesión recibida: ", len(claveSesion), " bytes")
                 print("[WM_WS_M] Validación correcta en Central. Manteniendo conexión con [WM_Central]")
                 sock_central = cliente
 
                 # Si el Engine ya estaba conectado, reanunciamos su estado a Central
                 if conn_engine:
                     estado = "FUERA_DE_SERVICIO" if bloqueada else "DISPONIBLE"
-                    id_ws = MENSAJE.split("#")[1]
-                    enviar_utf(cliente, f"CONNECT#{id_ws}#{estado}")
+                    #id_ws = MENSAJE.split("#")[1]
+                    enviar_utf(cliente, f"CONNECT#{estacion_id}#{estado}")
                 # Mantenemos conexión con WM_Central para notificar estado 
                 # de WS y actualizar estado en la bbdd
                 while True:
@@ -79,6 +87,7 @@ def hilo_cliente_central(MENSAJE, ADDR):
         finally:
             cliente.close()
             sock_central = None
+            claveSesion = None
             time.sleep(3)
 
 def splitear(mensaje):
@@ -389,15 +398,15 @@ def main():
         
         if credencial is None:
             print("No se pudo obtener la credencial. Registrando en WM_Registry")
-            cred = registrar_estacion(estacion_id, direccion, ubicacion)
-            if cred is None:
+            credencial = registrar_estacion(estacion_id, direccion, ubicacion)
+            if credencial is None:
                 print("[WM_WS_M] No se pudo obtener la credencial")
                 return
-            generar_fichero(estacion_id, cred)
-            
+            generar_fichero(estacion_id, credencial)        
+        
         
         # Hilo donde hace de cliente con el servidor WM_Central
-        t_client = threading.Thread(target=hilo_cliente_central, args=(MENSAJE, ADDR))
+        t_client = threading.Thread(target=hilo_cliente_central, args=(estacion_id, credencial, ADDR))
         t_client.start()
         time.sleep(1)
             
